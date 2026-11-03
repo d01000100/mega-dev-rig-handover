@@ -1,0 +1,47 @@
+# Publishes the digest preview to GitHub Pages (ADR 0003). The page is built here, from the
+# repo variable LANE_MARKER, so the preview never lands in the repo. Clear the variable and run
+# this again to upload the same page with "no marker set" over the same link.
+name: preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: pnpm install
+      - name: Save the digest page
+        env:
+          LANE_MARKER: ${{ vars.LANE_MARKER }}
+        run: pnpm preview:save
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: var/preview
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
