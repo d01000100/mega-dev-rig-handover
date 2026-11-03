@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { readNight } from './digest/read.js';
+import type { NightDigest } from './digest/types.js';
 import { loadConfig, type RigConfig } from './config.js';
 import { lane } from './lane.js';
 import { readStatus } from './status.js';
@@ -8,6 +9,13 @@ import { Layout } from './views/layout.js';
 import { StatusBoard } from './views/status.js';
 
 const NIGHT_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function getDigestForNight(config: RigConfig, night: string): NightDigest | null {
+  if (!NIGHT_PATTERN.test(night)) {
+    return null;
+  }
+  return readNight(config.runsDir, night);
+}
 
 export function createApp(config: RigConfig = loadConfig()) {
   const app = new Hono();
@@ -24,7 +32,7 @@ export function createApp(config: RigConfig = loadConfig()) {
 
   app.get('/digest/:night', (c) => {
     const night = c.req.param('night');
-    const digest = NIGHT_PATTERN.test(night) ? readNight(config.runsDir, night) : null;
+    const digest = getDigestForNight(config, night);
 
     if (digest === null) {
       return c.html(
@@ -41,6 +49,17 @@ export function createApp(config: RigConfig = loadConfig()) {
         <DigestPage digest={digest} />
       </Layout>,
     );
+  });
+
+  app.get('/api/digest/:night', (c) => {
+    const night = c.req.param('night');
+    const digest = getDigestForNight(config, night);
+
+    if (digest === null) {
+      return c.json({ error: 'no digest for this night' }, 404);
+    }
+
+    return c.json(digest);
   });
 
   return app;
